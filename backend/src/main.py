@@ -3,7 +3,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from src.routes import cities, migration
-from src.services.neo4j_service import Neo4jService
 
 app = FastAPI(title="Migration Map API")
 
@@ -16,15 +15,14 @@ app.add_middleware(
     allow_headers=["*"],  # Разрешаем все заголовки
 )
 
-# Инициализация сервиса Neo4j
-neo4j_service = Neo4jService()
-
 # Подключаем роуты
-app.include_router(cities.router, prefix="/api/v1")
-app.include_router(migration.router, prefix="/api/v1")
+app.include_router(cities.router, prefix="/api/v1/cities")
+app.include_router(migration.router, prefix="/api/v1/migration")
 
 @app.on_event("shutdown")
 async def shutdown_event():
+    from src.dependencies import get_neo4j_service
+    neo4j_service = get_neo4j_service()
     neo4j_service.close()
 
 if __name__ == "__main__":

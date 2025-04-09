@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from 'react';
-import { Container, Box, Typography, CircularProgress } from '@mui/material';
-import Stats from './components/Stats';
-import CityList from './components/CityList';
+import React, { useState, useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { Container, CssBaseline, ThemeProvider, createTheme } from '@mui/material';
 import MigrationMap from './components/MigrationMap';
+import MigrationFlowDetails from './components/MigrationFlowDetails';
 
 interface City {
+  id: number;
   name: string;
   region: string;
   latitude: number;
@@ -13,91 +14,69 @@ interface City {
 }
 
 interface MigrationStats {
-  total_migrations: number;
-  total_cities: number;
-  total_people: number;
-  avg_distance: number;
-  most_common_reasons: string[];
-  monthly_stats: Array<{
-    month: string;
-    count: number;
-  }>;
+  totalMigrations: number;
+  averageAge: number;
+  genderDistribution: {
+    male: number;
+    female: number;
+  };
+  topReasons: string[];
 }
 
-function App() {
+const theme = createTheme({
+  palette: {
+    mode: 'light',
+    primary: {
+      main: '#1976d2',
+    },
+    secondary: {
+      main: '#dc004e',
+    },
+  },
+});
+
+const App: React.FC = () => {
   const [cities, setCities] = useState<City[]>([]);
   const [stats, setStats] = useState<MigrationStats | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        setLoading(true);
-        setError(null);
+        const [citiesResponse, statsResponse] = await Promise.all([
+          fetch('/api/v1/cities'),
+          fetch('/api/v1/migration/stats')
+        ]);
 
-        // Загрузка списка городов
-        const citiesResponse = await fetch('http://localhost:8000/api/v1/cities');
-        if (!citiesResponse.ok) {
-          throw new Error('Помилка завантаження списку міст');
+        if (!citiesResponse.ok || !statsResponse.ok) {
+          throw new Error('Failed to fetch data');
         }
+
         const citiesData = await citiesResponse.json();
-        setCities(citiesData);
-
-        // Загрузка статистики миграции
-        const statsResponse = await fetch('http://localhost:8000/api/v1/migration/stats');
-        if (!statsResponse.ok) {
-          throw new Error('Помилка завантаження статистики');
-        }
         const statsData = await statsResponse.json();
-        setStats(statsData);
 
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Помилка завантаження даних');
-        console.error('Помилка:', err);
-      } finally {
-        setLoading(false);
+        setCities(citiesData);
+        setStats(statsData);
+      } catch (error) {
+        console.error('Помилка:', error);
       }
     };
 
     fetchData();
   }, []);
 
-  if (loading) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
-        <CircularProgress />
-      </Box>
-    );
-  }
-
-  if (error) {
-    return (
-      <Box sx={{ p: 3 }}>
-        <Typography color="error">{error}</Typography>
-      </Box>
-    );
-  }
-
   return (
-    <Container maxWidth="lg">
-      <Box sx={{ my: 4 }}>
-        <Typography variant="h3" component="h1" gutterBottom align="center">
-          Карта міграції України
-        </Typography>
-        
-        {stats && <Stats stats={stats} />}
-        
-        <Box sx={{ mt: 4 }}>
-          <CityList cities={cities} />
-        </Box>
-        
-        <Box sx={{ mt: 4 }}>
-          <MigrationMap cities={cities} />
-        </Box>
-      </Box>
-    </Container>
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <Router>
+        <Container maxWidth="xl">
+          <Routes>
+            <Route path="/" element={<MigrationMap />} />
+            <Route path="/flow/:fromCity/:toCity" element={<MigrationFlowDetails />} />
+          </Routes>
+        </Container>
+      </Router>
+    </ThemeProvider>
   );
-}
+};
 
 export default App; 

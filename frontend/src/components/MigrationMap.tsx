@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Typography, Paper, ToggleButtonGroup, ToggleButton } from '@mui/material';
-import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Polyline, Tooltip as LeafletTooltip } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
+import { useNavigate } from 'react-router-dom';
 
 // Исправление проблемы с иконками маркеров в Leaflet
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -29,20 +30,38 @@ interface MigrationFlow {
   distance: number;
 }
 
-interface MigrationMapProps {
-  cities: City[];
-}
+interface MigrationMapProps {}
 
-const MigrationMap: React.FC<MigrationMapProps> = ({ cities }) => {
+const MigrationMap: React.FC<MigrationMapProps> = () => {
   const [selectedCity, setSelectedCity] = useState<string | null>(null);
   const [visualizationType, setVisualizationType] = useState<'cities' | 'flows'>('cities');
   const [migrationFlows, setMigrationFlows] = useState<MigrationFlow[]>([]);
+  const [cities, setCities] = useState<City[]>([]);
+  const navigate = useNavigate();
+
+  // Загрузка городов
+  useEffect(() => {
+    const fetchCities = async () => {
+      try {
+        const response = await fetch('/api/v1/cities');
+        if (!response.ok) {
+          throw new Error('Помилка завантаження міст');
+        }
+        const data = await response.json();
+        setCities(data);
+      } catch (error) {
+        console.error('Помилка:', error);
+      }
+    };
+
+    fetchCities();
+  }, []);
 
   // Загрузка потоков миграции
   useEffect(() => {
     const fetchMigrationFlows = async () => {
       try {
-        const response = await fetch('http://localhost:8000/api/v1/migration/flows');
+        const response = await fetch('/api/v1/migration/flows');
         if (!response.ok) {
           throw new Error('Помилка завантаження потоків міграції');
         }
@@ -99,6 +118,12 @@ const MigrationMap: React.FC<MigrationMapProps> = ({ cities }) => {
   const getCityCoordinates = (cityName: string): [number, number] | null => {
     const city = cities.find(c => c.name === cityName);
     return city ? [city.latitude, city.longitude] : null;
+  };
+
+  const handleFlowClick = (fromCity: string, toCity: string) => {
+    const encodedFromCity = encodeURIComponent(fromCity);
+    const encodedToCity = encodeURIComponent(toCity);
+    navigate(`/flow/${encodedFromCity}/${encodedToCity}`);
   };
 
   return (
@@ -177,16 +202,21 @@ const MigrationMap: React.FC<MigrationMapProps> = ({ cities }) => {
                   weight: getFlowWeight(flow.count),
                   opacity: 0.6
                 }}
+                eventHandlers={{
+                  click: () => handleFlowClick(flow.fromCity, flow.toCity)
+                }}
               >
-                <Popup>
-                  <Typography variant="h6">Міграційний потік</Typography>
-                  <Typography>З: {flow.fromCity}</Typography>
-                  <Typography>До: {flow.toCity}</Typography>
-                  <Typography>Кількість: {flow.count}</Typography>
-                  <Typography>Середній вік: {flow.avg_age ? flow.avg_age.toFixed(1) : 'Н/Д'}</Typography>
-                  <Typography>Середня відстань: {flow.distance.toFixed(1)} км</Typography>
-                  <Typography>Причини: {flow.reasons ? flow.reasons.join(', ') : 'Н/Д'}</Typography>
-                </Popup>
+                <LeafletTooltip>
+                  <div>
+                    <Typography variant="subtitle2">Міграційний потік</Typography>
+                    <Typography>З: {flow.fromCity}</Typography>
+                    <Typography>До: {flow.toCity}</Typography>
+                    <Typography>Кількість: {flow.count}</Typography>
+                    <Typography>Середній вік: {flow.avg_age ? flow.avg_age.toFixed(1) : 'Н/Д'}</Typography>
+                    <Typography>Середня відстань: {flow.distance.toFixed(1)} км</Typography>
+                    <Typography>Причини: {flow.reasons ? flow.reasons.join(', ') : 'Н/Д'}</Typography>
+                  </div>
+                </LeafletTooltip>
               </Polyline>
             );
           })}

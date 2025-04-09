@@ -124,5 +124,58 @@ class Neo4jService:
             logger.error(f"Ошибка при получении общей статистики: {str(e)}")
             raise
 
+    async def get_flow_details(self, from_city: str, to_city: str) -> Dict[str, Any]:
+        """Получить детальную информацию о миграционном потоке между двумя городами"""
+        with self.driver.session() as session:
+            result = session.run("""
+                MATCH (from:City {name: $fromCity})<-[r1:MIGRATED]-(p:Person)-[r2:MIGRATED]->(to:City {name: $toCity})
+                WITH from, to,
+                     count(p) as totalCount,
+                     avg(p.age) as averageAge,
+                     collect({
+                         id: id(p),
+                         name: p.name,
+                         age: p.age,
+                         gender: p.gender,
+                         reason: r2.reason,
+                         date: r2.date,
+                         has_children: p.has_children,
+                         transport_type: r2.transport_type,
+                         monthly_income: p.monthly_income,
+                         housing_type: r2.housing_type
+                     }) as people,
+                     collect(DISTINCT r2.reason) as reasons,
+                     collect(DISTINCT r2.transport_type) as transports,
+                     collect(DISTINCT r2.housing_type) as housing
+                RETURN {
+                    fromCity: from.name,
+                    toCity: to.name,
+                    totalCount: totalCount,
+                    averageAge: averageAge,
+                    genderDistribution: [
+                        {gender: 'Чоловіча', count: size([p IN people WHERE p.gender = 'Чоловіча'])},
+                        {gender: 'Жіноча', count: size([p IN people WHERE p.gender = 'Жіноча'])}
+                    ],
+                    reasonDistribution: [reason IN reasons | {
+                        reason: reason,
+                        count: size([p IN people WHERE p.reason = reason])
+                    }],
+                    transportDistribution: [transport IN transports | {
+                        transport: transport,
+                        count: size([p IN people WHERE p.transport_type = transport])
+                    }],
+                    housingDistribution: [type IN housing | {
+                        housing: type,
+                        count: size([p IN people WHERE p.housing_type = type])
+                    }],
+                    people: people
+                } as flowDetails
+            """, fromCity=from_city, toCity=to_city)
+            
+            details = result.single()
+            if not details:
+                raise ValueError(f"Не знайдено міграційних потоків між містами {from_city} та {to_city}")
+            return details["flowDetails"]
+
     def close(self):
         self.driver.close() 

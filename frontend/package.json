@@ -10,13 +10,15 @@
     "@types/node": "^16.18.80",
     "@types/react": "^18.2.55",
     "@types/react-dom": "^18.2.19",
+    "@types/react-router-dom": "^5.3.3",
     "@types/recharts": "^1.8.29",
     "leaflet": "^1.9.4",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-leaflet": "^4.2.1",
+    "react-router-dom": "^6.22.3",
     "react-scripts": "5.0.1",
-    "recharts": "^2.12.0",
+    "recharts": "^2.15.2",
     "typescript": "^4.9.5"
   },
   "scripts": {
@@ -42,5 +44,6 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
-  }
+  },
+  "proxy": "http://localhost:8000"
 }
